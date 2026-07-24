@@ -1,0 +1,41 @@
+name: Update VIX Data
+
+on:
+  schedule:
+    # 每 15 分鐘自動執行一次 (可依需求調整)
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # 支援手動按鈕觸發
+
+jobs:
+  build-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Fetch Latest VIX Data
+        run: |
+          # 抓取 Yahoo Finance 的 美股 VIX (^VIX)
+          US_DATA=$(curl -s "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1m&range=1d" -H "User-Agent: Mozilla/5.0")
+          US_VIX=$(echo $US_DATA | jq '.chart.result[0].meta.regularMarketPrice // 15.0')
+          US_PREV=$(echo $US_DATA | jq '.chart.result[0].meta.chartPreviousClose // 15.0')
+
+          # 寫入 data.json
+          TIMESTAMP=$(date -u -d '+8 hours' '+%Y-%m-%d %H:%M:%S')
+          cat <<EOF > data.json
+          {
+            "tw_vix": 15.0,
+            "tw_prev_vix": 15.0,
+            "us_vix": $US_VIX,
+            "us_prev_vix": $US_PREV,
+            "updated_at": "$TIMESTAMP"
+          }
+          EOF
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add data.json
+          git commit -m "Auto update VIX data [skip ci]" || exit 0
+          git push
