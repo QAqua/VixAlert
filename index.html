@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIX 自動雙軌風控儀表板 (PWA)</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2622/2622282.png">
+
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-color: #f8fafc;
+            --border-color: #334155;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --info: #3b82f6;
+            --taiwan-color: #38bdf8;
+            --us-color: #c084fc;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 900px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            color: #38bdf8;
+        }
+
+        .mode-banner {
+            text-align: center;
+            padding: 10px 14px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .mode-tw {
+            background-color: rgba(2, 132, 199, 0.2);
+            color: var(--taiwan-color);
+            border: 1px solid var(--taiwan-color);
+        }
+
+        .mode-us {
+            background-color: rgba(139, 92, 246, 0.2);
+            color: var(--us-color);
+            border: 1px solid var(--us-color);
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
+
+        .fetch-status {
+            font-size: 0.8rem;
+            text-align: right;
+            margin-top: -10px;
+            margin-bottom: 10px;
+            color: #94a3b8;
+        }
+
+        .input-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.9rem;
+            color: #94a3b8;
+            margin-bottom: 5px;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background-color: #0f172a;
+            color: #fff;
+            font-size: 1.1rem;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #38bdf8;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            text-align: center;
+            margin-top: 15px;
+        }
+
+        .stat-box {
+            background-color: #0f172a;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+
+        .live-link-container {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px dashed var(--border-color);
+        }
+
+        .live-link {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            color: #38bdf8;
+            font-size: 0.85rem;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+
+        .live-link:hover {
+            color: #7dd3fc;
+            text-decoration: underline;
+        }
+
+        .up { color: var(--danger); }
+        .down { color: var(--success); }
+        .neutral { color: var(--text-color); }
+
+        .alert-zone {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .alert-card {
+            padding: 18px;
+            border-radius: 8px;
+            border-left: 5px solid var(--border-color);
+            background-color: #0f172a;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            opacity: 0.35;
+            transition: all 0.3s ease;
+        }
+
+        .alert-card.active {
+            opacity: 1;
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.12);
+        }
+
+        .alert-card.info { border-left-color: var(--info); }
+        .alert-card.danger { border-left-color: var(--danger); }
+        .alert-card.warning { border-left-color: var(--warning); }
+
+        .alert-header {
+            font-weight: bold;
+            font-size: 1.1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        .dual-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 5px;
+        }
+
+        .col-box {
+            background-color: rgba(30, 41, 59, 0.6);
+            padding: 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .col-title {
+            font-weight: bold;
+            font-size: 0.85rem;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .col-title.tw { color: var(--taiwan-color); }
+        .col-title.us { color: var(--us-color); }
+
+        .col-desc {
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            line-height: 1.45;
+        }
+
+        .badge {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background-color: #334155;
+            color: #fff;
+        }
+
+        .btn-action {
+            background-color: #38bdf8;
+            color: #0f172a;
+            border: none;
+            padding: 12px 14px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: 15px;
+            width: 100%;
+        }
+
+        .btn-action:hover {
+            background-color: #0284c7;
+            color: #fff;
+        }
+
+        @media (max-width: 650px) {
+            .input-group, .stats-grid, .dual-columns {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>VIX 風控儀表板</h1>
+    
+    <div id="modeBanner" class="mode-banner mode-tw">
+        載入時間模組中...
+    </div>
+
+    <div class="card">
+        <div id="fetchStatus" class="fetch-status">連線狀態: 準備抓取...</div>
+        <div class="input-group">
+            <div>
+                <label for="prevVix" id="labelPrev">昨日 VIX (基期)</label>
+                <input type="number" id="prevVix" value="15.0" step="0.1" oninput="calculate()">
+            </div>
+            <div>
+                <label for="currVix" id="labelCurr">即時 VIX</label>
+                <input type="number" id="currVix" value="15.0" step="0.1" oninput="calculate()">
+            </div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div>
+                    <label id="labelDisplay">當前 VIX</label>
+                    <div id="vixDisplay" class="stat-value neutral">15.0</div>
+                </div>
+                <div class="live-link-container">
+                    <a id="linkPrimary" href="https://www.wantgoo.com/index/vixtwn" target="_blank" rel="noopener noreferrer" class="live-link">
+                        🔗 開啟玩股網台指 VIX 報價 ↗
+                    </a>
+                </div>
+            </div>
+
+            <div class="stat-box">
+                <div>
+                    <label>單日變動率 (%)</label>
+                    <div id="changeDisplay" class="stat-value neutral">+0.0%</div>
+                </div>
+                <div class="live-link-container">
+                    <a id="linkSecondary" href="https://www.tradingview.com/symbols/TVC-VIX" target="_blank" rel="noopener noreferrer" class="live-link">
+                        📊 查看 TradingView 圖表 ↗
+                    </a>
+                </div>
+            </div>
+        </div>
+        <button class="btn-action" onclick="fetchVixData()">手動刷新數據 (CORS Proxy)</button>
+        <button class="btn-action" style="background-color:#475569; color:#fff;" onclick="requestNotification()">啟用 App 推播與聲音通知</button>
+    </div>
+
+    <div class="card">
+        <h2>雙軌風控標準與應對策略</h2>
+        <div class="alert-zone">
+            
+            <div id="alertDynamic" class="alert-card info">
+                <div class="alert-header">
+                    <span>【動態提示】避險需求湧入 (單日衝高 &gt; +15% ~ +20%)</span>
+                    <span class="badge">動態風險</span>
+                </div>
+                <div class="dual-columns">
+                    <div class="col-box">
+                        <div class="col-title tw">● 台灣市場 (台指 VIX)</div>
+                        <div class="col-desc">外資/主力大舉採買台指 Put 避險。即便絕對值低於 20，短線台股回檔壓力極大。</div>
+                    </div>
+                    <div class="col-box">
+                        <div class="col-title us">● 美股市場 (CBOE VIX)</div>
+                        <div class="col-desc">標普 500 選擇權買盤轉強，恐慌指數急急拉升。通常預示科技股（NVDA/TSMC）盤中將出現劇烈震盪。</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="alertSeller" class="alert-card danger">
+                <div class="alert-header">
+                    <span>【警告】期權賣方 / 期貨槓桿族（Gamma Risk 飆升）</span>
+                    <span class="badge">台指 &gt; 22 | 美股 &gt; 25</span>
+                </div>
+                <div class="dual-columns">
+                    <div class="col-box">
+                        <div class="col-title tw">● 台指選擇權 (TXO) 賣方</div>
+                        <div class="col-desc"><strong>門檻: VIX &gt; 22 或 單日暴漲 &gt; 15%</strong><br>權證/選擇權賣方 Delta 與 Gamma 劇烈變動，應即刻減碼倒點部位，做 Delta 中性避險或砍倉降槓桿。</div>
+                    </div>
+                    <div class="col-box">
+                        <div class="col-title us">● 美股期權 / 槓桿 ETF 族群</div>
+                        <div class="col-desc"><strong>門檻: VIX &gt; 25 或 單日暴漲 &gt; 15%</strong><br>美股波動加劇，做空波動率（Short Vol）策略易遭雙去，個股期權 IV Crush 風險增加，建議調降個股期權賣方曝險。</div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="alertSpot" class="alert-card warning">
+                <div class="alert-header">
+                    <span>【提示】多頭現貨 / 定期定額（極度恐慌逢低買點）</span>
+                    <span class="badge">台指 &gt; 30 | 美股 &gt; 35</span>
+                </div>
+                <div class="dual-columns">
+                    <div class="col-box">
+                        <div class="col-title tw">● 台股現貨 / 0050 / 0056</div>
+                        <div class="col-desc"><strong>門檻: VIX &gt; 30</strong><br>台股進入非理性拋售區（常伴隨跌停潮）。勿在恐慌時殺低現貨，應啟動預留現金，採取雙倍額度「分批抄底加碼」。</div>
+                    </div>
+                    <div class="col-box">
+                        <div class="col-title us">● 美股大盤 ETF (SPY/QQQ)</div>
+                        <div class="col-desc"><strong>門檻: VIX &gt; 35</strong><br>美股進入系統性恐慌區。歷史數據顯示 VIX 破 35 後均值回歸概率極高，為長線分批佈局指數型 ETF 的黃金時間。</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('SW Registered:', reg.scope))
+            .catch(err => console.error('SW Error:', err));
+    }
+
+    let isTaiwanSession = true;
+
+
+function checkTradingSession() {
+    const now = new Date();
+    const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const twTime = new Date(utc + (3600000 * 8));
+
+    const hours = twTime.getHours();
+    const minutes = twTime.getMinutes();
+    const currentMinutes = hours * 60 + minutes;
+
+    const startMinutes = 9 * 60;          // 09:00
+    const endMinutes = 13 * 60 + 45;     // 13:45
+
+    const modeBanner = document.getElementById('modeBanner');
+    const labelPrev = document.getElementById('labelPrev');
+    const labelCurr = document.getElementById('labelCurr');
+    const labelDisplay = document.getElementById('labelDisplay');
+    const linkPrimary = document.getElementById('linkPrimary');
+    const linkSecondary = document.getElementById('linkSecondary');
+
+    // 固定位置：左側為美股 VIX，右側為台灣台指 VIX
+    linkPrimary.href = 'https://www.tradingview.com/symbols/TVC-VIX';
+    linkPrimary.innerText = '🔗 開啟 TradingView 美股 VIX ↗';
+
+    linkSecondary.href = 'https://www.wantgoo.com/index/vixtwn';
+    linkSecondary.innerText = '📊 開啟玩股網台指 VIX ↗';
+
+    if (currentMinutes >= startMinutes && currentMinutes <= endMinutes) {
+        isTaiwanSession = true;
+        modeBanner.className = 'mode-banner mode-tw';
+        modeBanner.innerText = '● 目前時段：台灣日盤 (09:00~13:45) ➔ 採用 [台指 VIX (VIXTWN)] 風控門檻';
+        labelPrev.innerText = '昨日台指 VIX (基期)';
+        labelCurr.innerText = '即時台指 VIX';
+        labelDisplay.innerText = '當前台指 VIX';
+    } else {
+        isTaiwanSession = false;
+        modeBanner.className = 'mode-banner mode-us';
+        modeBanner.innerText = '○ 目前時段：夜盤 / 美股時段 ➔ 自動切換 [美股 VIX (S&P 500)] 風控門檻';
+        labelPrev.innerText = '昨日美股 VIX (基期)';
+        labelCurr.innerText = '即時美股 VIX';
+        labelDisplay.innerText = '當前美股 VIX';
+    }
+    
+    fetchVixData();
+}
+async function fetchVixData() {
+    const statusEl = document.getElementById('fetchStatus');
+    statusEl.innerText = "🔄 正在讀取 JSON 數據...";
+    
+    try {
+        // 直接抓取同源 GitHub Pages 的 data.json
+        const response = await fetch('./data.json?t=' + new Date().getTime());
+        if (!response.ok) throw new Error("無效的 JSON 檔案");
+        
+        const data = await response.json();
+        
+        if (isTaiwanSession) {
+            document.getElementById('currVix').value = data.tw_vix;
+            document.getElementById('prevVix').value = data.tw_prev_vix || 15.0;
+            statusEl.innerText = `🟢 台指 VIX 已更新 (${data.updated_at})`;
+        } else {
+            document.getElementById('currVix').value = data.us_vix;
+            document.getElementById('prevVix').value = data.us_prev_vix || 15.0;
+            statusEl.innerText = `🟢 美股 VIX 已更新 (${data.updated_at})`;
+        }
+    } catch (err) {
+        console.warn("JSON 讀取失敗:", err);
+        statusEl.innerText = "⚠️ 數據更新中（請點擊下方連結查詢）";
+    }
+    
+    calculate();
+}
+    
+	function calculate() {
+        const prev = parseFloat(document.getElementById('prevVix').value) || 0;
+        const curr = parseFloat(document.getElementById('currVix').value) || 0;
+        if (prev <= 0) return;
+
+        const changePercent = ((curr - prev) / prev) * 100;
+        const vixDisplay = document.getElementById('vixDisplay');
+        const changeDisplay = document.getElementById('changeDisplay');
+
+        vixDisplay.innerText = curr.toFixed(1);
+        changeDisplay.innerText = (changePercent >= 0 ? '+' : '') + changePercent.toFixed(1) + '%';
+        changeDisplay.className = 'stat-value ' + (changePercent > 0 ? 'up' : changePercent < 0 ? 'down' : 'neutral');
+
+        resetAlerts();
+        let triggerAlert = false;
+
+        const sellerThreshold = isTaiwanSession ? 22 : 25;
+        const spotThreshold = isTaiwanSession ? 30 : 35;
+
+        if (changePercent >= 15) { 
+            activateAlert('alertDynamic'); 
+            triggerAlert = true; 
+        }
+
+        if (curr > sellerThreshold || changePercent >= 15) { 
+            activateAlert('alertSeller'); 
+            triggerAlert = true; 
+        }
+
+        if (curr > spotThreshold) { 
+            activateAlert('alertSpot'); 
+            triggerAlert = true; 
+        }
+
+        if (triggerAlert) sendAppNotification(curr, changePercent);
+    }
+
+    function resetAlerts() {
+        document.querySelectorAll('.alert-card').forEach(card => card.classList.remove('active'));
+    }
+
+    function activateAlert(id) {
+        document.getElementById(id).classList.add('active');
+    }
+
+    function requestNotification() {
+        if ('Notification' in window) {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    alert('App 推播通知權限已開啟！');
+                }
+            });
+        }
+    }
+
+    function sendAppNotification(vix, change) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+            const sourceText = isTaiwanSession ? '台指 VIX' : '美股 VIX';
+            navigator.serviceWorker.ready.then(registration => {
+                registration.showNotification(`[${sourceText}] 風控警報觸發`, {
+                    body: `當前數值: ${vix.toFixed(1)} (${change >= 0 ? '+' : ''}${change.toFixed(1)}%)，請留意持倉風險！`,
+                    icon: 'https://cdn-icons-png.flaticon.com/512/2622/2622282.png'
+                });
+            });
+        }
+    }
+
+    window.onload = () => {
+        checkTradingSession();
+        setInterval(checkTradingSession, 300000); // 每 5 分鐘自動背景更新
+    };
+</script>
+
+</body>
+</html>
