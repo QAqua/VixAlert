@@ -2,7 +2,7 @@ name: Update VIX Data
 
 on:
   schedule:
-    # 每 15 分鐘自動執行一次 (可依需求調整)
+    # 每 15 分鐘自動執行一次
     - cron: '*/15 * * * *'
   workflow_dispatch: # 支援手動按鈕觸發
 
@@ -15,17 +15,25 @@ jobs:
 
       - name: Fetch Latest VIX Data
         run: |
-          # 抓取 Yahoo Finance 的 美股 VIX (^VIX)
+          # 1. 抓取 美股 VIX (^VIX)
           US_DATA=$(curl -s "https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?interval=1m&range=1d" -H "User-Agent: Mozilla/5.0")
           US_VIX=$(echo $US_DATA | jq '.chart.result[0].meta.regularMarketPrice // 15.0')
           US_PREV=$(echo $US_DATA | jq '.chart.result[0].meta.chartPreviousClose // 15.0')
 
-          # 寫入 data.json
+          # 2. 抓取 台灣 VIX (VIXTWN) - 從 玩股網 擷取即時數值
+          TW_HTML=$(curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" "https://www.wantgoo.com/index/vixtwn")
+          TW_VIX=$(echo "$TW_HTML" | grep -oP 'id="idx-price"[^>]*>\K[0-9.]+' | head -n 1)
+          
+          # 若爬取失敗則設預設值 15.0
+          if [ -z "$TW_VIX" ]; then TW_VIX=15.0; fi
+          TW_PREV=$TW_VIX
+
+          # 3. 寫入 data.json
           TIMESTAMP=$(date -u -d '+8 hours' '+%Y-%m-%d %H:%M:%S')
           cat <<EOF > data.json
           {
-            "tw_vix": 15.0,
-            "tw_prev_vix": 15.0,
+            "tw_vix": $TW_VIX,
+            "tw_prev_vix": $TW_PREV,
             "us_vix": $US_VIX,
             "us_prev_vix": $US_PREV,
             "updated_at": "$TIMESTAMP"
